@@ -1,0 +1,23 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.wheel {
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  border: 12px solid #021321;
+  background: white;
+  margin-top: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 24px;
+  font-weight: bold;
+}
