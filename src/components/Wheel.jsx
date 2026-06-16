@@ -3,13 +3,13 @@ import { useState, useRef } from 'react';
 // Define the structure for our wheel segments
 
 const SEGMENTS = [
-  { id: 1, label: 'STICKER', type: 'prize', colorClass: 'dark' },
-  { id: 2, label: 'NOTE PAD & PEN', type: 'prize', colorClass: 'light' },
-  { id: 3, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark' },
-  { id: 4, label: 'TOTE BAG', type: 'prize', colorClass: 'light' },
-  { id: 5, label: 'KEY HOLDER', type: 'prize', colorClass: 'dark' },
-  { id: 6, label: 'OOPS! BETTER LUCK', type: 'loss', colorClass: 'light' },
-  { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark' },
+  { id: 1, label: 'STICKER', type: 'prize', colorClass: 'dark' , imagename: 'sticker.jpeg'},	
+  { id: 2, label: 'NOTE PAD & PEN', type: 'prize', colorClass: 'light', imagename: 'notepadandpen.jpeg' },
+  { id: 3, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
+  { id: 4, label: 'TOTE BAG', type: 'prize', colorClass: 'light', imagename: 'totebag.jpeg' },
+  { id: 5, label: 'KEY HOLDER', type: 'prize', colorClass: 'dark', imagename: 'keyholder.jpeg' },
+  { id: 6, label: 'OOPS! BETTER LUCK', type: 'loss', colorClass: 'light', imagename: 'oops.jpeg' },
+  { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
 ];
 
 export default function SpinWheel() {
@@ -112,8 +112,12 @@ export default function SpinWheel() {
                       {seg.label}
                     </span>
                     {/* Placeholder for assets/icons - standard sizing configured here */}
-                    <div className="w-12 h-12 mt-4 opacity-80 flex items-center justify-center border border-dashed border-current rounded">
-                      <span className="text-[9px]">Asset</span>
+                    <div className="w-15 h-12 mt-4 opacity-80 flex items-center justify-center ">
+                    <img 
+                        src={`/assets/${seg.imagename}`} 
+                        alt={seg.label} 
+                        className="w-20 h-16 object-contain mt-2 drop-shadow-md" 
+                    />
                     </div>
                   </div>
                 </div>
