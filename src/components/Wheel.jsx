@@ -138,7 +138,7 @@ export default function SpinWheel() {
         <div className="w-[300px] bg-gray-950 mt-[-4px] pt-12 pb-6 px-6 rounded-b-2xl text-center shadow-xl border-t-4 border-emerald-500 z-10 flex flex-col items-center">
           <h2 className="text-lg font-bold tracking-widest text-white">METRO</h2>
           <p className="text-xs font-bold tracking-widest text-white">ELECTRIC</p>
-          
+
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE THE FUTURE</p>
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE ELECTRIC</p>
           
@@ -161,7 +161,7 @@ export default function SpinWheel() {
         <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center max-w-sm animate-bounce">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Result</p>
           <h3 className="text-xl font-black mt-1">
-            {prize.type === 'prize' ? `🎉 You won a ${prize.label}!` : `❌ ${prize.label}`}
+            {prize.type === 'prize' ? `✨ You won a ${prize.label}!` : `❌ ${prize.label}`}
           </h3>
         </div>
       )}
