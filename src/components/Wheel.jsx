@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import ResultModal from './Resultmodal';
 
 // Define the structure for our wheel segments
 
@@ -107,16 +108,16 @@ export default function SpinWheel() {
                   className="absolute top-0 left-0 w-full h-full flex justify-center origin-center"
                   style={{ transform: `rotate(${rotation + (degreesPerSegment / 2)}deg)` }}
                 >
-                  <div className={`mt-12 flex flex-col items-center text-center max-w-[100px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <div className={`mt-15 flex flex-col items-center text-center max-w-[100px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     <span className="text-xs font-black tracking-wider uppercase leading-tight">
                       {seg.label}
                     </span>
                     {/* Placeholder for assets/icons - standard sizing configured here */}
-                    <div className="w-15 h-12 mt-4 opacity-80 flex items-center justify-center ">
+                    <div className="w-15 h-16 mt-4 opacity-80 flex items-center justify-center ">
                     <img 
                         src={`/assets/${seg.imagename}`} 
                         alt={seg.label} 
-                        className="w-20 h-16 object-contain mt-2 drop-shadow-md" 
+                        className="w-20 h-30 object-contain mt-2 drop-shadow-md" 
                     />
                     </div>
                   </div>
@@ -161,14 +162,20 @@ export default function SpinWheel() {
       </div>
 
       {/* Win Modal / Announcement */}
-      {prize && (
+      
+      <ResultModal
+            isOpen={!!prize}
+            segment={prize}
+             onClose={() => setPrize(null)}
+        />
+      {/* {prize && (
         <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center max-w-sm animate-bounce">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Result</p>
           <h3 className="text-xl font-black mt-1">
             {prize.type === 'prize' ? `✨ You won a ${prize.label}!` : `❌ ${prize.label}`}
           </h3>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
