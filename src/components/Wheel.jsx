@@ -1,15 +1,16 @@
 import { useState, useRef } from 'react';
+import ResultModal from './Resultmodal';
 
 // Define the structure for our wheel segments
 
 const SEGMENTS = [
-  { id: 1, label: 'STICKER', type: 'prize', colorClass: 'dark' },
-  { id: 2, label: 'NOTE PAD & PEN', type: 'prize', colorClass: 'light' },
-  { id: 3, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark' },
-  { id: 4, label: 'TOTE BAG', type: 'prize', colorClass: 'light' },
-  { id: 5, label: 'KEY HOLDER', type: 'prize', colorClass: 'dark' },
-  { id: 6, label: 'OOPS! BETTER LUCK', type: 'loss', colorClass: 'light' },
-  { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark' },
+  { id: 1, label: 'STICKER', type: 'prize', colorClass: 'dark' , imagename: 'sticker.jpeg'},	
+  { id: 2, label: 'NOTE PAD & PEN', type: 'prize', colorClass: 'light', imagename: 'notepadandpen.jpeg' },
+  { id: 3, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
+  { id: 4, label: 'TOTE BAG', type: 'prize', colorClass: 'light', imagename: 'totebag.jpeg' },
+  { id: 5, label: 'KEY HOLDER', type: 'prize', colorClass: 'dark', imagename: 'keyholder.jpeg' },
+  { id: 6, label: 'OOPS! BETTER LUCK', type: 'loss', colorClass: 'light', imagename: 'oops.jpeg' },
+  { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
 ];
 
 export default function SpinWheel() {
@@ -107,13 +108,17 @@ export default function SpinWheel() {
                   className="absolute top-0 left-0 w-full h-full flex justify-center origin-center"
                   style={{ transform: `rotate(${rotation + (degreesPerSegment / 2)}deg)` }}
                 >
-                  <div className={`mt-12 flex flex-col items-center text-center max-w-[100px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <div className={`mt-15 flex flex-col items-center text-center max-w-[100px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     <span className="text-xs font-black tracking-wider uppercase leading-tight">
                       {seg.label}
                     </span>
                     {/* Placeholder for assets/icons - standard sizing configured here */}
-                    <div className="w-12 h-12 mt-4 opacity-80 flex items-center justify-center border border-dashed border-current rounded">
-                      <span className="text-[9px]">Asset</span>
+                    <div className="w-15 h-16 mt-4 opacity-80 flex items-center justify-center ">
+                    <img 
+                        src={`/assets/${seg.imagename}`} 
+                        alt={seg.label} 
+                        className="w-20 h-30 object-contain mt-2 drop-shadow-md" 
+                    />
                     </div>
                   </div>
                 </div>
@@ -138,7 +143,7 @@ export default function SpinWheel() {
         <div className="w-[300px] bg-gray-950 mt-[-4px] pt-12 pb-6 px-6 rounded-b-2xl text-center shadow-xl border-t-4 border-emerald-500 z-10 flex flex-col items-center">
           <h2 className="text-lg font-bold tracking-widest text-white">METRO</h2>
           <p className="text-xs font-bold tracking-widest text-white">ELECTRIC</p>
-          
+
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE THE FUTURE</p>
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE ELECTRIC</p>
           
@@ -157,14 +162,20 @@ export default function SpinWheel() {
       </div>
 
       {/* Win Modal / Announcement */}
-      {prize && (
+      
+      <ResultModal
+            isOpen={!!prize}
+            segment={prize}
+             onClose={() => setPrize(null)}
+        />
+      {/* {prize && (
         <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center max-w-sm animate-bounce">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Result</p>
           <h3 className="text-xl font-black mt-1">
-            {prize.type === 'prize' ? `🎉 You won a ${prize.label}!` : `❌ ${prize.label}`}
+            {prize.type === 'prize' ? `✨ You won a ${prize.label}!` : `❌ ${prize.label}`}
           </h3>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
