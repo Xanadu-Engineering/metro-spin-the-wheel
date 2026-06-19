@@ -142,7 +142,7 @@ export default function SpinWheel() {
         {/* Bottom Base / Brand Stand */}
         <div className="w-[300px] bg-gray-950 mt-[-4px] pt-12 pb-6 px-6 rounded-b-2xl text-center shadow-xl border-t-4 border-emerald-500 z-10 flex flex-col items-center">
           <h2 className="text-lg font-bold tracking-widest text-white">METRO</h2>
-          <p className="text-xs font-bold tracking-widest text-white">ELECTRIC</p>
+          <h2 className="text-lg font-bold tracking-widest text-white">ELECTRIC</h2>
 
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE THE FUTURE</p>
           <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE ELECTRIC</p>
