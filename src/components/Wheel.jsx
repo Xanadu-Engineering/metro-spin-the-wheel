@@ -1,5 +1,7 @@
-import { useState, useRef } from 'react';
-import ResultModal from './Resultmodal';
+import { useState, useRef, useEffect } from 'react';
+// import ResultModal from './Resultmodal';
+import { useNavigate } from "react-router-dom";
+
 
 // Define the structure for our wheel segments
 
@@ -13,7 +15,13 @@ const SEGMENTS = [
   { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
 ];
 
+const StoreKeys = {
+  cannotSpin: 'ksnliks',
+  prize: 'klnskdr'
+}
+
 export default function SpinWheel() {
+  const navigate = useNavigate();
   const [isSpinning, setIsSpinning] = useState(false);
   const [prize, setPrize] = useState(null);
   const wheelRef = useRef(null);
@@ -21,15 +29,27 @@ export default function SpinWheel() {
   const totalSegments = SEGMENTS.length;
   const degreesPerSegment = 360 / totalSegments;
 
+  const [cachedPrize, setCachedPrize]= useState(null)
+  const [cannotSpin, setcannotSpin] = useState(false)
+
   const handleSpin = () => {
     if (isSpinning || !wheelRef.current) return;
 
     setIsSpinning(true);
     setPrize(null);
 
+    
     // 1. Pick a random winning segment index
     const winningIndex = Math.floor(Math.random() * totalSegments);
     const selectedPrize = SEGMENTS[winningIndex];
+
+    if(['STICKER','NOTE PAD & PEN','TOTE BAG','KEY HOLDER'].includes(selectedPrize.label)){
+      setcannotSpin(false)
+      localStorage.setItem(StoreKeys.cannotSpin, true)
+    }
+
+    setCachedPrize(selectedPrize)
+    localStorage.setItem(StoreKeys.prize, JSON.stringify(selectedPrize))
 
     // 2. Calculate rotation
     // Spin at least 5 full rounds (1800 deg) for visual suspense
@@ -56,12 +76,28 @@ export default function SpinWheel() {
       if (wheelRef.current) {
         wheelRef.current.style.transition = 'none';
         wheelRef.current.style.transform = `rotate(${finalRotation % 360}deg)`;
-      }
-    }, 4000); // Must match the CSS transition duration
+      }navigate("/result", { 
+    state: { result: selectedPrize } 
+  });
+}, 4600); // Must match the CSS transition duration
   };
 
+  useEffect(()=>{
+    const localStorePrize = localStorage.getItem(StoreKeys.prize);
+    const localStorecannotSpin = localStorage.getItem(StoreKeys.cannotSpin);
+    console.log(localStorecannotSpin, localStorePrize)
+    if(localStorePrize){
+      console.log("Weting dey sele")
+      setCachedPrize(JSON.parse(localStorePrize))
+    }
+    // if(localStorecannotSpin){
+    //   console.log("Why are you not responding")
+    //   setcannotSpin(!!localStorecannotSpin)
+    // }
+  },[])
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen  text-white p-4">
       
       {/* Outer Wrapper with Stand */}
       <div className="relative flex flex-col items-center select-none">
@@ -114,11 +150,13 @@ export default function SpinWheel() {
                     </span>
                     {/* Placeholder for assets/icons - standard sizing configured here */}
                     <div className="w-15 h-16 mt-4 opacity-80 flex items-center justify-center ">
-                    <img 
-                        src={`/assets/${seg.imagename}`} 
-                        alt={seg.label} 
-                        className="w-20 h-30 object-contain mt-2 drop-shadow-md" 
-                    />
+                    {seg.type === 'prize' && (
+                  <img 
+                    src={`/assets/${seg.imagename}`} 
+                    alt={seg.label} 
+                    className="w-20 h-17 object-contain mt-0.5 drop-shadow-md" 
+                   />
+)}
                     </div>
                   </div>
                 </div>
@@ -149,7 +187,7 @@ export default function SpinWheel() {
           
           <button
             onClick={handleSpin}
-            disabled={isSpinning}
+            disabled={isSpinning || cannotSpin}
             className={`mt-6 px-8 py-2.5 rounded-full font-bold uppercase tracking-wider text-sm transition-all shadow-md ${
               isSpinning 
                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
@@ -163,11 +201,11 @@ export default function SpinWheel() {
 
       {/* Win Modal / Announcement */}
       
-      <ResultModal
+      {/* <ResultPage
             isOpen={!!prize}
             segment={prize}
              onClose={() => setPrize(null)}
-        />
+        /> */}
       {/* {prize && (
         <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center max-w-sm animate-bounce">
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Result</p>
