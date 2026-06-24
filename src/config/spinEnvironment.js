@@ -11,5 +11,6 @@ export const APP_ENV = normalizeAppEnv(
 );
 
 export const IS_PRODUCTION_ENV = APP_ENV === 'Production';
-
-export const SPIN_LOCK_API_URL = import.meta.env.VITE_SPIN_LOCK_API_URL || '/api/spin-lock';
+export const HAS_SUPABASE_BROWSER_CONFIG = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+);
