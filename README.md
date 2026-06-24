@@ -5,6 +5,7 @@ A React + Vite spin-the-wheel app for making random selections from a list of op
 ## Features
 
 - Interactive spinning wheel
+- One spin per device, enforced server-side (with a `TRY AGAIN` exception)
 - Custom option list support
 - Responsive React UI
 - Fast local development with Vite
@@ -54,6 +55,14 @@ npm run serve:production
 Production uses `.env.production` with `VITE_APP_ENV=Production`. In this mode the app calls `/api/spin-lock` before the wheel starts spinning. The server records a device fingerprint in `server/spin-store.json` and refuses another spin from that same device, even from another browser that produces the same device fingerprint.
 
 To reset local production testing, stop the server and delete `server/spin-store.json`.
+
+## Spin-once logic
+
+In production each device is allowed a **single spin**. The rule is enforced on the server (`server/index.js`) and keyed to a browser-neutral device fingerprint, so clearing `localStorage` — or opening another browser on the same machine — does not grant a new spin.
+
+The one exception is **`TRY AGAIN`**: whenever a spin lands on it, the device is allowed to spin again. This repeats for as long as the wheel keeps landing on `TRY AGAIN`. The session only ends once the device lands on a real outcome — a prize, or `OOPS! BETTER LUCK` — after which further spins are refused.
+
+In development (`VITE_APP_ENV=Development`) the lock is disabled entirely and spins are unlimited.
 
 ## Project Structure
 
