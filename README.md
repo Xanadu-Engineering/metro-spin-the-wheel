@@ -52,7 +52,20 @@ You can also build and start in one command:
 npm run serve:production
 ```
 
-Production uses `.env.production` with `VITE_APP_ENV=Production`. In this mode the app calls `/api/spin-lock` before the wheel starts spinning. The server records a device fingerprint in `server/spin-store.json` and refuses another spin from that same device, even from another browser that produces the same device fingerprint.
+Production uses `.env.production` with `VITE_APP_ENV=Production`. In this mode the app calls `/api/spin-lock` before the wheel starts spinning. Local production stores spin history in `server/spin-store.json` and refuses another spin from that same device, even from another browser that produces the same device fingerprint.
+
+## Vercel deployment
+
+Vercel does not run `server/index.js` as a persistent server, so the API must live in `api/spin-lock.js`. This repo now includes that serverless function and a `vercel.json` SPA rewrite.
+
+Important: Vercel functions are stateless, so `server/spin-store.json` is only reliable locally. For production on Vercel, add a Vercel KV database and set:
+
+```bash
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
+```
+
+When those env vars are present, the spin lock uses KV storage automatically.
 
 To reset local production testing, stop the server and delete `server/spin-store.json`.
 
