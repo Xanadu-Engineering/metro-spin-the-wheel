@@ -1,5 +1,6 @@
-import { IS_PRODUCTION_ENV, SPIN_LOCK_API_URL } from '../config/spinEnvironment';
-import { getDeviceId } from './deviceFingerprint';
+import { HAS_SUPABASE_BROWSER_CONFIG, IS_PRODUCTION_ENV } from '../config/spinEnvironment.js';
+import { getSupabaseClient } from '../lib/supabaseClient.js';
+import { getDeviceId } from './deviceFingerprint.js';
 
 const StoreKeys = {
   spinState: 'metro-spin-state-v1',
@@ -58,22 +59,15 @@ export function rememberSpin(result) {
   }
 }
 
-async function parseSpinResponse(response) {
-  const payload = await response.json().catch(() => ({}));
-
-  if (response.status === 409) {
-    return {
-      allowed: false,
-      hasSpun: true,
-      spin: payload.spin || null,
-    };
+function normalizeRpcPayload(payload) {
+  if (!payload?.body) {
+    throw new Error('Supabase returned an invalid response.');
   }
 
-  if (!response.ok) {
-    throw new Error(payload.message || 'Unable to check this device right now.');
-  }
-
-  return payload;
+  return {
+    statusCode: payload.statusCode,
+    ...payload.body,
+  };
 }
 
 export async function getProductionSpinStatus() {
@@ -81,18 +75,23 @@ export async function getProductionSpinStatus() {
     return { hasSpun: false, canSpin: true, spin: null };
   }
 
+  if (!HAS_SUPABASE_BROWSER_CONFIG) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.',
+    );
+  }
+
   const deviceId = await getDeviceId();
-  const url = new URL(SPIN_LOCK_API_URL, window.location.origin);
-
-  url.searchParams.set('deviceId', deviceId);
-
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-    },
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('get_spin_lock_status', {
+    p_device_id: deviceId,
   });
 
-  const payload = await parseSpinResponse(response);
+  if (error) {
+    throw new Error(error.message || 'Unable to check this device right now.');
+  }
+
+  const payload = normalizeRpcPayload(data);
 
   if (payload.hasSpun && payload.spin?.result) {
     rememberSpin(payload.spin.result);
@@ -110,17 +109,23 @@ export async function claimProductionSpin() {
     return { allowed: true, spin: null };
   }
 
+  if (!HAS_SUPABASE_BROWSER_CONFIG) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.',
+    );
+  }
+
   const deviceId = await getDeviceId();
-  const response = await fetch(SPIN_LOCK_API_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ deviceId }),
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('claim_spin_lock', {
+    p_device_id: deviceId,
   });
 
-  const payload = await parseSpinResponse(response);
+  if (error) {
+    throw new Error(error.message || 'Unable to verify this device right now.');
+  }
+
+  const payload = normalizeRpcPayload(data);
 
   if (payload.spin?.result) {
     rememberSpin(payload.spin.result);

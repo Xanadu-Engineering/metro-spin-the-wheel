@@ -1,10 +1,10 @@
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createClient } from '@supabase/supabase-js';
 import { SEGMENTS } from '../src/data/segments.js';
 
 const RESPIN_LABEL = 'TRY AGAIN';
-const KV_KEY_PREFIX = 'spin-device:';
 
 function hashValue(value) {
   return createHash('sha256').update(value || 'unknown').digest('hex');
@@ -67,29 +67,21 @@ export async function readRequestBody(request) {
   return body ? JSON.parse(body) : {};
 }
 
-async function kvRequest(pathname, init = {}) {
-  const baseUrl = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-
-  if (!baseUrl || !token) return null;
-
-  const response = await fetch(`${baseUrl}${pathname}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`KV request failed with status ${response.status}.`);
-  }
-
-  return response.json();
+export function hasSupabaseConfig() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-export function hasKvConfig() {
-  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+function createSupabaseAdminClient() {
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
 }
 
 export function createSpinStore({ storePath } = {}) {
@@ -115,10 +107,19 @@ export function createSpinStore({ storePath } = {}) {
   }
 
   async function getEntry(deviceId) {
-    const kvPayload = await kvRequest(`/get/${KV_KEY_PREFIX}${deviceId}`);
+    if (hasSupabaseConfig()) {
+      const supabase = createSupabaseAdminClient();
+      const { data, error } = await supabase
+        .from('spin_devices')
+        .select('attempts')
+        .eq('device_id', deviceId)
+        .maybeSingle();
 
-    if (kvPayload) {
-      return kvPayload.result ? JSON.parse(kvPayload.result) : null;
+      if (error) {
+        throw new Error(`Supabase read failed: ${error.message}`);
+      }
+
+      return data ? { attempts: data.attempts || [] } : null;
     }
 
     const store = await readFileStore();
@@ -127,23 +128,24 @@ export function createSpinStore({ storePath } = {}) {
 
   function updateEntry(deviceId, mutator) {
     const next = storeQueue.then(async () => {
-      const kvPayload = await kvRequest(`/get/${KV_KEY_PREFIX}${deviceId}`);
+      if (hasSupabaseConfig()) {
+        const result = await mutator(null);
 
-      if (kvPayload) {
-        const entry = kvPayload.result ? JSON.parse(kvPayload.result) : null;
-        const result = await mutator(entry);
-
-        if (result.changed) {
-          await kvRequest(`/set/${KV_KEY_PREFIX}${deviceId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(result.entry),
-          });
+        if (!result.changed) {
+          return result.response;
         }
 
-        return result.response;
+        const supabase = createSupabaseAdminClient();
+        const { data, error } = await supabase.rpc('claim_spin_lock', {
+          p_device_id: deviceId,
+          p_spin: result.entry,
+        });
+
+        if (error) {
+          throw new Error(`Supabase write failed: ${error.message}`);
+        }
+
+        return data;
       }
 
       const store = await readFileStore();
@@ -180,44 +182,50 @@ export async function getSpinStatus(store, deviceId) {
 }
 
 export async function claimSpin(store, deviceId, request) {
+  const spin = {
+    id: randomUUID(),
+    result: SEGMENTS[randomInt(SEGMENTS.length)],
+    spunAt: new Date().toISOString(),
+    ipHash: hashValue(getRequestIp(request)),
+  };
+
   return store.updateEntry(deviceId, async (entry) => {
-    if (!deviceCanSpin(entry)) {
+    if (!hasSupabaseConfig()) {
+      if (!deviceCanSpin(entry)) {
+        return {
+          changed: false,
+          response: {
+            statusCode: 409,
+            body: {
+              allowed: false,
+              hasSpun: true,
+              canSpin: false,
+              spin: publicSpin(latestSpin(entry)),
+            },
+          },
+        };
+      }
+
+      const nextEntry = { attempts: [...getAttempts(entry), spin] };
+
       return {
-        changed: false,
+        changed: true,
+        entry: nextEntry,
         response: {
-          statusCode: 409,
+          statusCode: 201,
           body: {
-            allowed: false,
+            allowed: true,
             hasSpun: true,
-            canSpin: false,
-            spin: publicSpin(latestSpin(entry)),
+            canSpin: deviceCanSpin(nextEntry),
+            spin: publicSpin(spin),
           },
         },
       };
     }
 
-    const selectedSegment = SEGMENTS[randomInt(SEGMENTS.length)];
-    const spin = {
-      id: randomUUID(),
-      result: selectedSegment,
-      spunAt: new Date().toISOString(),
-      ipHash: hashValue(getRequestIp(request)),
-    };
-
-    const nextEntry = { attempts: [...getAttempts(entry), spin] };
-
     return {
       changed: true,
-      entry: nextEntry,
-      response: {
-        statusCode: 201,
-        body: {
-          allowed: true,
-          hasSpun: true,
-          canSpin: deviceCanSpin(nextEntry),
-          spin: publicSpin(spin),
-        },
-      },
+      entry: spin,
     };
   });
 }

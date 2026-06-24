@@ -58,14 +58,16 @@ Production uses `.env.production` with `VITE_APP_ENV=Production`. In this mode t
 
 Vercel does not run `server/index.js` as a persistent server, so the API must live in `api/spin-lock.js`. This repo now includes that serverless function and a `vercel.json` SPA rewrite.
 
-Important: Vercel functions are stateless, so `server/spin-store.json` is only reliable locally. For production on Vercel, add a Vercel KV database and set:
+If you want the frontend to talk to Supabase directly, use browser-safe env vars instead:
 
 ```bash
-KV_REST_API_URL=...
-KV_REST_API_TOKEN=...
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-When those env vars are present, the spin lock uses KV storage automatically.
+When those env vars are present, the app talks to Supabase directly from the browser using RPC functions and a publishable key.
+
+Run the SQL in `supabase/spin_lock.sql` inside the Supabase SQL editor before deploying. It creates the `spin_devices` table, enables RLS, revokes direct table access, and exposes only the `claim_spin_lock` and `get_spin_lock_status` RPC functions to the browser.
 
 To reset local production testing, stop the server and delete `server/spin-store.json`.
 

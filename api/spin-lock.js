@@ -3,7 +3,7 @@ import {
   claimSpin,
   createSpinStore,
   getSpinStatus,
-  hasKvConfig,
+  hasSupabaseConfig,
   isValidDeviceId,
   readRequestBody,
 } from '../server/spinService.js';
@@ -18,9 +18,9 @@ function sendJson(response, statusCode, body) {
 
 export default async function handler(request, response) {
   try {
-    if (process.env.VERCEL && !hasKvConfig()) {
+    if (process.env.VERCEL && !hasSupabaseConfig()) {
       sendJson(response, 500, {
-        message: 'Spin lock storage is not configured. Add KV_REST_API_URL and KV_REST_API_TOKEN in Vercel.',
+        message: 'Spin lock storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel.',
       });
       return;
     }
