@@ -1,219 +1,315 @@
-import { useState, useRef, useEffect } from 'react';
-// import ResultModal from './Resultmodal';
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { SEGMENTS, getRandomSegment, getSegmentIndex } from '../data/segments';
+import {
+  IS_PRODUCTION_ENV,
+  claimProductionSpin,
+  getProductionSpinStatus,
+  getStoredSpin,
+  rememberSpin,
+} from '../utils/spinLock';
 
-
-// Define the structure for our wheel segments
-
-const SEGMENTS = [
-  { id: 1, label: 'STICKER', type: 'prize', colorClass: 'dark' , imagename: 'sticker.jpeg'},	
-  { id: 2, label: 'NOTE PAD & PEN', type: 'prize', colorClass: 'light', imagename: 'notepadandpen.jpeg' },
-  { id: 3, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
-  { id: 4, label: 'TOTE BAG', type: 'prize', colorClass: 'light', imagename: 'totebag.jpeg' },
-  { id: 5, label: 'KEY HOLDER', type: 'prize', colorClass: 'dark', imagename: 'keyholder.jpeg' },
-  { id: 6, label: 'OOPS! BETTER LUCK', type: 'loss', colorClass: 'light', imagename: 'oops.jpeg' },
-  { id: 7, label: 'TRY AGAIN', type: 'loss', colorClass: 'dark', imagename: 'tryagain.jpeg' },
-];
-
-const StoreKeys = {
-  cannotSpin: 'ksnliks',
-  prize: 'klnskdr'
-}
+const SPIN_DURATION_MS = 4600;
+const PRIZE_LABELS = new Set(['STICKER', 'NOTE PAD & PEN', 'TOTE BAG', 'KEY HOLDER']);
 
 export default function SpinWheel() {
   const navigate = useNavigate();
   const [isSpinning, setIsSpinning] = useState(false);
-  const [prize, setPrize] = useState(null);
+  const [isClaimingSpin, setIsClaimingSpin] = useState(false);
+  const [isCheckingSpin, setIsCheckingSpin] = useState(IS_PRODUCTION_ENV);
   const wheelRef = useRef(null);
-  
+  const pointerRef = useRef(null);
+  const tickRafRef = useRef(null);
+
   const totalSegments = SEGMENTS.length;
   const degreesPerSegment = 360 / totalSegments;
 
-  const [cachedPrize, setCachedPrize]= useState(null)
-  const [cannotSpin, setcannotSpin] = useState(false)
+  const [cachedPrize, setCachedPrize] = useState(null);
+  const [cannotSpin, setCannotSpin] = useState(false);
+  const [spinMessage, setSpinMessage] = useState('');
 
-  const handleSpin = () => {
-    if (isSpinning || !wheelRef.current) return;
+  // Stop the pointer's tick loop and return it to its resting position.
+  const stopPointerTicks = useCallback(() => {
+    if (tickRafRef.current) {
+      cancelAnimationFrame(tickRafRef.current);
+      tickRafRef.current = null;
+    }
+    if (pointerRef.current) {
+      pointerRef.current.style.animation = 'none';
+      pointerRef.current.style.transform = '';
+    }
+  }, []);
 
-    setIsSpinning(true);
-    setPrize(null);
+  // Drive the pointer off the wheel's *actual* rotation: every time a segment
+  // edge passes under it, knock it sideways like a real peg pointer. Because we
+  // read the live (decelerating) angle, the ticks slow down with the wheel and
+  // stop the moment it stops.
+  const startPointerTicks = () => {
+    const wheel = wheelRef.current;
+    const pointer = pointerRef.current;
+    if (!wheel || !pointer) return;
 
-    
-    // 1. Pick a random winning segment index
-    const winningIndex = Math.floor(Math.random() * totalSegments);
-    const selectedPrize = SEGMENTS[winningIndex];
+    stopPointerTicks();
 
-    if(['STICKER','NOTE PAD & PEN','TOTE BAG','KEY HOLDER'].includes(selectedPrize.label)){
-      setcannotSpin(false)
-      localStorage.setItem(StoreKeys.cannotSpin, true)
+    let lastBoundary = null;
+
+    const readWheelAngle = () => {
+      const matrix = getComputedStyle(wheel).transform;
+      if (!matrix || matrix === 'none') return 0;
+      const values = matrix.match(/matrix\(([^)]+)\)/);
+      if (!values) return 0;
+      const [a, b] = values[1].split(',').map(Number);
+      return Math.atan2(b, a) * (180 / Math.PI);
+    };
+
+    const tick = () => {
+      const angle = readWheelAngle();
+      const normalized = ((angle % 360) + 360) % 360;
+      const boundary = Math.floor(normalized / degreesPerSegment);
+
+      if (lastBoundary !== null && boundary !== lastBoundary) {
+        // Restart the knock animation for each peg that passes.
+        pointer.style.animation = 'none';
+        void pointer.offsetWidth; // force reflow so the animation replays
+        pointer.style.animation = 'metroPointerTick 0.22s ease-out';
+      }
+      lastBoundary = boundary;
+      tickRafRef.current = requestAnimationFrame(tick);
+    };
+
+    tickRafRef.current = requestAnimationFrame(tick);
+  };
+
+  const handleSpin = async () => {
+    if (isSpinning || isClaimingSpin || isCheckingSpin || cannotSpin || !wheelRef.current) return;
+
+    setSpinMessage('');
+    setIsClaimingSpin(true);
+
+    let selectedPrize;
+
+    try {
+      if (IS_PRODUCTION_ENV) {
+        const claim = await claimProductionSpin();
+
+        if (!claim.allowed || !claim.spin?.result) {
+          const previousResult = claim.spin?.result || cachedPrize;
+
+          setCachedPrize(previousResult || null);
+          setCannotSpin(true);
+          setSpinMessage(
+            previousResult
+              ? `This device has already spun. Previous result: ${previousResult.label}.`
+              : 'This device has already used its spin.',
+          );
+          return;
+        }
+
+        selectedPrize = claim.spin.result;
+        setCannotSpin(true);
+      } else {
+        selectedPrize = getRandomSegment();
+        rememberSpin(selectedPrize);
+      }
+    } catch (error) {
+      setSpinMessage(error.message || 'Unable to verify this device right now.');
+      setCannotSpin(IS_PRODUCTION_ENV);
+      return;
+    } finally {
+      setIsClaimingSpin(false);
     }
 
-    setCachedPrize(selectedPrize)
-    localStorage.setItem(StoreKeys.prize, JSON.stringify(selectedPrize))
+    const winningIndex = getSegmentIndex(selectedPrize.id);
 
-    // 2. Calculate rotation
-    // Spin at least 5 full rounds (1800 deg) for visual suspense
+    if (winningIndex < 0 || !wheelRef.current) return;
+
+    setIsSpinning(true);
+    setCachedPrize(selectedPrize);
+    startPointerTicks();
+
     const extraRounds = 5 * 360; 
-    
-    // Calculate the target angle to line up with the top pointer (0 degrees)
-    // We subtract the angle because the wheel spins clockwise, moving segments backwards relative to the top
     const targetAngle = 360 - (winningIndex * degreesPerSegment);
-    
-    // Center the pointer perfectly in the middle of the chosen segment
     const centerOffset = degreesPerSegment / 2;
     const finalRotation = extraRounds + targetAngle - centerOffset;
 
-    // 3. Apply animation directly via inline style/web animation API to persist state cleanly
     wheelRef.current.style.transition = 'transform 4s cubic-bezier(0.1, 0.8, 0.3, 1)';
     wheelRef.current.style.transform = `rotate(${finalRotation}deg)`;
 
-    // 4. Handle spin completion
     setTimeout(() => {
       setIsSpinning(false);
-      setPrize(selectedPrize);
+      stopPointerTicks();
       
-      // Optional: Reset transition and normalize rotation to keep degrees under 360
       if (wheelRef.current) {
         wheelRef.current.style.transition = 'none';
         wheelRef.current.style.transform = `rotate(${finalRotation % 360}deg)`;
-      }navigate("/result", { 
-    state: { result: selectedPrize } 
-  });
-}, 4600); // Must match the CSS transition duration
+      }
+
+      navigate('/result', {
+        state: { result: selectedPrize },
+      });
+    }, SPIN_DURATION_MS);
   };
 
-  useEffect(()=>{
-    const localStorePrize = localStorage.getItem(StoreKeys.prize);
-    const localStorecannotSpin = localStorage.getItem(StoreKeys.cannotSpin);
-    console.log(localStorecannotSpin, localStorePrize)
-    if(localStorePrize){
-      console.log("Weting dey sele")
-      setCachedPrize(JSON.parse(localStorePrize))
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSpinState() {
+      const storedSpin = getStoredSpin();
+
+      if (storedSpin?.result) {
+        setCachedPrize(storedSpin.result);
+      }
+
+      if (!IS_PRODUCTION_ENV) {
+        setCannotSpin(false);
+        setIsCheckingSpin(false);
+        return;
+      }
+
+      try {
+        const status = await getProductionSpinStatus();
+
+        if (!isMounted) return;
+
+        const previousResult = status.spin?.result || storedSpin?.result || null;
+
+        if (previousResult) {
+          setCachedPrize(previousResult);
+        }
+
+        if (status.hasSpun && !status.canSpin) {
+          setCannotSpin(true);
+          setSpinMessage(
+            previousResult
+              ? `This device has already spun. Previous result: ${previousResult.label}.`
+              : 'This device has already used its spin.',
+          );
+        } else {
+          // Either a fresh device, or a "TRY AGAIN" landing that earned one more spin.
+          setCannotSpin(false);
+          setSpinMessage(
+            status.hasSpun ? 'You landed on TRY AGAIN — you have one more spin!' : '',
+          );
+        }
+      } catch (error) {
+        if (!isMounted) return;
+
+        setCannotSpin(true);
+        setSpinMessage(error.message || 'Unable to verify this device right now.');
+      } finally {
+        if (isMounted) {
+          setIsCheckingSpin(false);
+        }
+      }
     }
-    // if(localStorecannotSpin){
-    //   console.log("Why are you not responding")
-    //   setcannotSpin(!!localStorecannotSpin)
-    // }
-  },[])
+
+    loadSpinState();
+
+    return () => {
+      isMounted = false;
+      stopPointerTicks();
+    };
+  }, [stopPointerTicks]);
+
+  const isSpinDisabled = isSpinning || isClaimingSpin || isCheckingSpin || cannotSpin;
+  const buttonLabel = isCheckingSpin || isClaimingSpin
+    ? 'Checking...'
+    : isSpinning
+      ? 'Spinning...'
+      : cannotSpin
+        ? 'Already Spun'
+        : 'Spin Wheel';
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen  text-white p-4">
-      
-      {/* Outer Wrapper with Stand */}
-      <div className="relative flex flex-col items-center select-none">
-        
-        {/* Top Ticker / Pointer */}
-        <div className="absolute top-[-16px] z-30 filter drop-shadow-md transition-transform duration-100">
-          <svg width="40" height="50" viewBox="0 0 40 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 50C20 50 40 30 40 16C40 7.16344 32.8366 0 24 0H16C7.16344 0 0 7.16344 0 16C0 30 20 50 20 50Z" fill="#111827"/>
-            <path d="M20 40C20 40 34 26 34 16C34 8.26801 27.732 2 20 2C12.268 2 6 8.26801 6 16C6 26 20 40 20 40Z" fill="#10B981"/>
-            <circle cx="20" cy="16" r="5" fill="#111827"/>
-          </svg>
-        </div>
+    <main className="wheel-page" aria-label="Metropolitan Electric spin wheel">
+      <a
+        className="site-logo-link"
+        href="https://metropolitanelectricng.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Visit Metropolitan Electric website"
+      >
+        <img src="/brand/metro-mark.svg" alt="" aria-hidden="true" />
+        <span>Metropolitan Electric</span>
+      </a>
 
-        {/* The Spinning Wheel */}
-        <div 
-          ref={wheelRef}
-          className="relative w-[500px] h-[500px] rounded-full border-8 border-gray-900 shadow-2xl overflow-hidden ring-4 ring-emerald-500/30"
-          style={{
-            // Generates alternating segments dynamically matching the image style
-            background: `conic-gradient(${SEGMENTS.map((seg, i) => {
-              const color = seg.colorClass === 'dark' ? '#111827' : '#f3f4f6';
-              return `${color} ${i * degreesPerSegment}deg ${(i + 1) * degreesPerSegment}deg`;
-            }).join(', ')})`
-          }}
-        >
-          {/* Segment Content (Text & Lines) */}
-          {SEGMENTS.map((seg, i) => {
-            const rotation = i * degreesPerSegment;
-            const isDark = seg.colorClass === 'dark';
+      <section className="wheel-stage">
+        <div className="wheel-rig">
+          <div ref={pointerRef} className="wheel-pointer" aria-hidden="true">
+            <svg width="48" height="58" viewBox="0 0 40 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 50C20 50 40 30 40 16C40 7.16344 32.8366 0 24 0H16C7.16344 0 0 7.16344 0 16C0 30 20 50 20 50Z" fill="#111827" />
+              <path d="M20 40C20 40 34 26 34 16C34 8.26801 27.732 2 20 2C12.268 2 6 8.26801 6 16C6 26 20 40 20 40Z" fill="#10B981" />
+              <circle cx="20" cy="16" r="5" fill="#111827" />
+            </svg>
+          </div>
 
-            return (
-              <div key={seg.id}>
-                {/* Boundary Divider Line */}
-                <div 
-                  className="absolute top-0 left-1/2 w-[2px] h-1/2 bg-white/40 origin-bottom transform -translate-x-1/2"
-                  style={{ transform: `rotate(${rotation}deg)` }}
-                >
-                  {/* Outer boundary dot node */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow" />
-                </div>
+          <div
+            ref={wheelRef}
+            className="spin-wheel"
+            style={{
+              background: `conic-gradient(${SEGMENTS.map((seg, i) => {
+                const color = seg.colorClass === 'dark' ? '#111827' : '#f3f4f6';
+                return `${color} ${i * degreesPerSegment}deg ${(i + 1) * degreesPerSegment}deg`;
+              }).join(', ')})`,
+            }}
+          >
+            {SEGMENTS.map((seg, i) => {
+              const rotation = i * degreesPerSegment;
+              const isDark = seg.colorClass === 'dark';
 
-                {/* Content Container (Rotated into the middle of the segment slice) */}
-                <div 
-                  className="absolute top-0 left-0 w-full h-full flex justify-center origin-center"
-                  style={{ transform: `rotate(${rotation + (degreesPerSegment / 2)}deg)` }}
-                >
-                  <div className={`mt-15 flex flex-col items-center text-center max-w-[100px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <span className="text-xs font-black tracking-wider uppercase leading-tight">
-                      {seg.label}
-                    </span>
-                    {/* Placeholder for assets/icons - standard sizing configured here */}
-                    <div className="w-15 h-16 mt-4 opacity-80 flex items-center justify-center ">
-                    {seg.type === 'prize' && (
-                  <img 
-                    src={`/assets/${seg.imagename}`} 
-                    alt={seg.label} 
-                    className="w-20 h-17 object-contain mt-0.5 drop-shadow-md" 
-                   />
-)}
+              return (
+                <div key={seg.id}>
+                  <div
+                    className="wheel-divider"
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                  >
+                    <div />
+                  </div>
+
+                  <div
+                    className="wheel-segment"
+                    style={{ transform: `rotate(${rotation + degreesPerSegment / 2}deg)` }}
+                  >
+                    <div className={isDark ? 'segment-content is-dark' : 'segment-content'}>
+                      <span>{seg.label}</span>
+                      <div className="segment-icon">
+                        {PRIZE_LABELS.has(seg.label) && (
+                          <img src={`/assets/${seg.imagename}`} alt={seg.label} />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* Central Logo Cap */}
-          <div className="absolute inset-0 m-auto w-24 h-24 bg-gray-900 border-4 border-white rounded-full flex items-center justify-center shadow-xl z-20">
-            {/* Steering Wheel/Metro Icon SVG */}
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white stroke-2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 2a10 10 0 0 1 0 20" />
-              <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
-              <path d="M12 12L3 12" />
-              <path d="M12 12L21 12" />
-            </svg>
+            <div className="wheel-cap">
+              <img src="/brand/metro-mark.svg" alt="Metropolitan Electric" />
+            </div>
           </div>
         </div>
 
-        {/* Bottom Base / Brand Stand */}
-        <div className="w-[300px] bg-gray-950 mt-[-4px] pt-12 pb-6 px-6 rounded-b-2xl text-center shadow-xl border-t-4 border-emerald-500 z-10 flex flex-col items-center">
-          <h2 className="text-lg font-bold tracking-widest text-white">METRO</h2>
-          <h2 className="text-lg font-bold tracking-widest text-white">ELECTRIC</h2>
+        <div className="wheel-base">
+          <h1>METRO</h1>
+          <h2>ELECTRIC</h2>
+          <p>DRIVE THE FUTURE</p>
 
-          <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE THE FUTURE</p>
-          <p className="text-xs tracking-widest text-gray-400 mt-0.5">DRIVE ELECTRIC</p>
-          
           <button
+            type="button"
             onClick={handleSpin}
-            disabled={isSpinning || cannotSpin}
-            className={`mt-6 px-8 py-2.5 rounded-full font-bold uppercase tracking-wider text-sm transition-all shadow-md ${
-              isSpinning 
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
-                : 'bg-emerald-500 text-gray-950 hover:bg-emerald-400 active:scale-95'
-            }`}
+            disabled={isSpinDisabled}
+            className="mt-[1.4rem] inline-flex min-h-[2.85rem] min-w-44 cursor-pointer items-center justify-center rounded-full bg-[linear-gradient(180deg,#34d399,#10b981)] px-[1.7rem] text-[0.85rem] font-bold uppercase tracking-[0.06em] text-[#04130d] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_0.7rem_1.5rem_rgba(16,185,129,0.32)] transition-[transform,box-shadow,filter] duration-180 enabled:hover:-translate-y-0.5 enabled:hover:brightness-105 enabled:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0.95rem_1.9rem_rgba(16,185,129,0.42)] enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-none disabled:bg-metro-text disabled:text-[#6b7280] disabled:shadow-none"
           >
-            {isSpinning ? 'Spinning...' : 'Spin Wheel'}
+            {buttonLabel}
           </button>
         </div>
-      </div>
 
-      {/* Win Modal / Announcement */}
-      
-      {/* <ResultPage
-            isOpen={!!prize}
-            segment={prize}
-             onClose={() => setPrize(null)}
-        /> */}
-      {/* {prize && (
-        <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center max-w-sm animate-bounce">
-          <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Result</p>
-          <h3 className="text-xl font-black mt-1">
-            {prize.type === 'prize' ? `✨ You won a ${prize.label}!` : `❌ ${prize.label}`}
-          </h3>
-        </div>
-      )} */}
-    </div>
+        {spinMessage && (
+          <p className="spin-message" role="status" aria-live="polite">
+            {spinMessage}
+          </p>
+        )}
+      </section>
+    </main>
   );
 }

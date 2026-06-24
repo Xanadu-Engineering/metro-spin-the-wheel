@@ -31,17 +31,29 @@ Start the development server:
 npm run dev
 ```
 
+Development uses `.env.development` with `VITE_APP_ENV=Development`, so spins are unlimited while testing locally.
+
 Build for production:
 
 ```bash
 npm run build
 ```
 
-Preview the production build:
+Run the production build with the spin-lock API:
 
 ```bash
-npm run preview
+npm start
 ```
+
+You can also build and start in one command:
+
+```bash
+npm run serve:production
+```
+
+Production uses `.env.production` with `VITE_APP_ENV=Production`. In this mode the app calls `/api/spin-lock` before the wheel starts spinning. The server records a device fingerprint in `server/spin-store.json` and refuses another spin from that same device, even from another browser that produces the same device fingerprint.
+
+To reset local production testing, stop the server and delete `server/spin-store.json`.
 
 ## Project Structure
 

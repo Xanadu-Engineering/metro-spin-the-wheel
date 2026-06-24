@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+server/spin-store.json
+
+.env*
+.env
 
 # Editor directories and files
 .vscode/*

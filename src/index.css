@@ -1,2 +1,476 @@
-/* @import "tailwindcss"; */
 @import "tailwindcss";
+@import "./assets/fonts/Elemental End/stylesheet.css";
+
+/* Design tokens — exposed to Tailwind as utilities (bg-metro-green, text-metro-dark,
+   font-display, …) and reused by the wheel CSS below through the :root aliases. */
+@theme {
+  --color-metro-dark: #111827;
+  --color-metro-ink: #0b1220;
+  --color-metro-green: #10b981;
+  --color-metro-green-hover: #34d399;
+  --color-metro-light: #f3f4f6;
+  --color-metro-text: #1f2937;
+  --font-display: "Elemental End", "Space Grotesk", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+:root {
+  --metro-dark: var(--color-metro-dark);
+  --metro-ink: var(--color-metro-ink);
+  --metro-green: var(--color-metro-green);
+  --metro-green-hover: var(--color-metro-green-hover);
+  --metro-light: var(--color-metro-light);
+  --metro-text: var(--color-metro-text);
+  --metro-display: var(--font-display);
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color: var(--color-metro-text);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--metro-green);
+  outline-offset: 4px;
+}
+
+.metro-app-shell {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(130% 95% at 50% -12%, rgba(16, 185, 129, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 58%, rgba(11, 18, 32, 0.16) 100%),
+    linear-gradient(rgba(11, 18, 32, 0.55), rgba(11, 18, 32, 0.55)),
+    url("/homeBg.png") center / cover no-repeat;
+}
+
+/* ----------------------------------------------------------------------------
+   Wheel / home page — kept in CSS: the wheel scales every part off one
+   --wheel-size variable via calc(), uses gradients and a JS-driven keyframe,
+   none of which map cleanly to Tailwind utilities.
+   ---------------------------------------------------------------------------- */
+
+.wheel-page {
+  position: relative;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 5.8rem 1rem 2rem;
+}
+
+.site-logo-link {
+  position: absolute;
+  top: 1.25rem;
+  left: 50%;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: calc(100% - 1.5rem);
+  min-height: 3.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(11, 18, 32, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0.8rem 2rem rgba(11, 18, 32, 0.3);
+  color: #ffffff;
+  text-decoration: none;
+  transform: translateX(-50%);
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.site-logo-link:hover {
+  background: rgba(11, 18, 32, 0.78);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.site-logo-link img {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  filter: invert(1);
+}
+
+.site-logo-link span {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.wheel-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 34rem);
+  user-select: none;
+  animation: stageIn 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The whole wheel is driven by this one size so every part scales together.
+   Capped by width (88vw) and height (64vh) so it never overflows the screen. */
+.wheel-rig {
+  --wheel-size: min(31.25rem, 88vw, 64vh);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: var(--wheel-size);
+  max-width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+/* Soft emerald spotlight that grounds the wheel and reads as "electric" energy. */
+.wheel-rig::before {
+  content: "";
+  position: absolute;
+  inset: -9%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.42) 0%,
+    rgba(16, 185, 129, 0.15) 42%,
+    transparent 70%
+  );
+  filter: blur(clamp(14px, calc(var(--wheel-size) * 0.05), 26px));
+  animation: glowPulse 4.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: calc(var(--wheel-size) * -0.032);
+  left: 50%;
+  z-index: 30;
+  width: calc(var(--wheel-size) * 0.096);
+  height: calc(var(--wheel-size) * 0.117);
+  transform: translateX(-50%);
+  transform-origin: 50% calc(var(--wheel-size) * 0.022);
+  filter: drop-shadow(0 0.5rem 0.5rem rgba(11, 18, 32, 0.3));
+}
+
+.wheel-pointer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.spin-wheel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: calc(var(--wheel-size) * 0.016) solid var(--metro-dark);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 0.28rem rgba(255, 255, 255, 0.6),
+    0 0 0 0.62rem rgba(16, 185, 129, 0.34),
+    0 2.2rem 4.5rem rgba(11, 18, 32, 0.4);
+}
+
+.wheel-divider {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0.125rem;
+  height: 50%;
+  background: rgba(255, 255, 255, 0.42);
+  transform-origin: bottom;
+}
+
+.wheel-divider div {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(var(--wheel-size) * 0.024);
+  height: calc(var(--wheel-size) * 0.024);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0.25rem 0.75rem rgba(17, 24, 39, 0.2);
+  transform: translate(-50%, -50%);
+}
+
+.wheel-segment {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  transform-origin: center;
+}
+
+.segment-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--wheel-size) * 0.022);
+  width: calc(var(--wheel-size) * 0.2);
+  margin-top: calc(var(--wheel-size) * 0.12);
+  color: var(--metro-dark);
+  text-align: center;
+}
+
+.segment-content.is-dark {
+  color: #ffffff;
+}
+
+.segment-content span {
+  display: block;
+  min-height: calc(var(--wheel-size) * 0.064);
+  font-size: clamp(0.5rem, calc(var(--wheel-size) * 0.023), 0.74rem);
+  font-weight: 700;
+  line-height: 1.12;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.segment-icon {
+  display: grid;
+  width: calc(var(--wheel-size) * 0.14);
+  height: calc(var(--wheel-size) * 0.128);
+  place-items: center;
+}
+
+.segment-icon img {
+  max-width: calc(var(--wheel-size) * 0.14);
+  max-height: calc(var(--wheel-size) * 0.128);
+  object-fit: contain;
+  filter: drop-shadow(0 0.35rem 0.35rem rgba(17, 24, 39, 0.22));
+}
+
+.wheel-cap {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  width: calc(var(--wheel-size) * 0.205);
+  height: calc(var(--wheel-size) * 0.205);
+  margin: auto;
+  place-items: center;
+  border: 0.28rem solid #ffffff;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 32%, #1f2937 0%, #0b1220 78%);
+  box-shadow:
+    0 0.85rem 1.8rem rgba(11, 18, 32, 0.5),
+    0 0 1.5rem rgba(16, 185, 129, 0.4);
+}
+
+.wheel-cap img {
+  width: calc(var(--wheel-size) * 0.1);
+  height: calc(var(--wheel-size) * 0.1);
+  object-fit: contain;
+  filter: invert(1);
+}
+
+.wheel-base {
+  z-index: 5;
+  display: flex;
+  width: min(18.75rem, 78vw);
+  flex-direction: column;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 3rem 1.5rem 1.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 0.22rem solid var(--metro-green);
+  border-radius: 0 0 1.25rem 1.25rem;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.94), rgba(11, 18, 32, 0.97));
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 1.6rem 3rem rgba(11, 18, 32, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.wheel-base h1,
+.wheel-base h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: var(--metro-display);
+  font-size: clamp(1rem, 0.82rem + 0.9vw, 1.2rem);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+}
+
+.wheel-base h2 {
+  color: var(--metro-green);
+}
+
+.wheel-base p {
+  margin: 0.6rem 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.64rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  text-indent: 0.26em;
+}
+
+.spin-message {
+  width: min(100%, 22rem);
+  margin: 1.2rem auto 0;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.9rem;
+  background: rgba(11, 18, 32, 0.82);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@keyframes metroPointerTick {
+  0% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  42% {
+    transform: translateX(-50%) rotate(15deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+}
+
+@keyframes stageIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-stage,
+  .wheel-rig::before {
+    animation: none;
+  }
+}
+
+/* Phones (portrait) — tighten chrome; the wheel + its parts auto-scale via --wheel-size. */
+@media (max-width: 640px) {
+  .wheel-page {
+    padding: 5.25rem 0.75rem 1.25rem;
+  }
+
+  .site-logo-link {
+    top: 0.9rem;
+  }
+
+  .site-logo-link span {
+    font-size: 0.78rem;
+  }
+
+  .site-logo-link img {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .wheel-rig {
+    --wheel-size: min(22rem, 92vw, 72vh);
+  }
+
+  .wheel-base {
+    width: min(17rem, 82vw);
+    padding-top: 2.55rem;
+  }
+
+  .wheel-base h1,
+  .wheel-base h2 {
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
+  }
+
+  .wheel-base p {
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+  }
+}
+
+/* Short / landscape viewports — reclaim vertical space (wheel is already height-capped). */
+@media (max-height: 640px) {
+  .wheel-page {
+    padding-top: 4.25rem;
+    padding-bottom: 1rem;
+  }
+
+  .site-logo-link {
+    top: 0.7rem;
+    min-height: 3rem;
+  }
+
+  .wheel-base {
+    width: min(15rem, 90vw);
+    padding-top: 2.2rem;
+    padding-bottom: 1.25rem;
+  }
+}
+
+/* Very small phones (≈320px) — keep the base wide enough for the button, ease tracking. */
+@media (max-width: 380px) {
+  .wheel-base {
+    width: min(15.5rem, 88vw);
+  }
+
+  .site-logo-link span {
+    font-size: 0.7rem;
+  }
+
+  .wheel-base h1,
+  .wheel-base h2 {
+    letter-spacing: 0.08em;
+    text-indent: 0.08em;
+  }
+
+  .wheel-base p {
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-indent: 0.16em;
+  }
+}
