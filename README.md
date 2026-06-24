@@ -116,4 +116,4 @@ npm install -D @tailwindcss/vite
 
 ## Development Notes
 
-The main app logic lives in `src/App.jsx`, and the spinning wheel UI is handled by `src/components/Wheel.jsx`. Global styles are split between `src/index.css` and `src/App.css`.
+The main app logic lives in `src/App.jsx`, and the spinning wheel UI is handled by `src/components/Wheel.jsx`. Global styles are split between `src/index.css` and `src/App.css`
